@@ -35,33 +35,39 @@ define concat::fragment(
     $owner = $::id,
     $group = $concat::setup::root_group,
     $backup = 'puppet') {
-  $safe_name = regsubst($name, '[/\n]', '_', 'GM')
-  $safe_target_name = regsubst($target, '[/\n]', '_', 'GM')
-  $concatdir = $concat::setup::concatdir
-  $fragdir = "${concatdir}/${safe_target_name}"
+    $safe_name = regsubst($name, '[/\n]', '_', 'GM')
+    $safe_target_name = regsubst($target, '[/\n]', '_', 'GM')
+    $concatdir = $concat::setup::concatdir
+    $fragdir = "${concatdir}/${safe_target_name}"
 
-  # if content is passed, use that, else if source is passed use that
-  # if neither passed, but $ensure is in symlink form, make a symlink
-  case $ensure {
-    '', 'absent', 'present', 'file', 'directory': {
-      if ! ($content or $source) {
-        crit('No content, source or symlink specified')
-      }
-    }
-    default: {
-      # do nothing, make puppet-lint happy
-    }
-  }
+    if $ensure == 'present' {
+        if $source == '' and $content == undef {
+            fail("One of \$source or \$content must be specified")
+        }
 
-  file{"${fragdir}/fragments/${order}_${safe_name}":
-    ensure  => $ensure,
-    mode    => $mode,
-    owner   => $owner,
-    group   => $group,
-    source  => $source,
-    content => $content,
-    backup  => $backup,
-    alias   => "concat_fragment_${name}",
-    notify  => Exec["concat_${target}"]
-  }
+        if $source != '' and $content != undef {
+            fail("Only one of \$source or \$content must be specified")
+        }
+    }
+
+    file{"${fragdir}/fragments/${order}_${safe_name}":
+        ensure  => $ensure,
+        mode    => $mode,
+        owner   => $owner,
+        group   => $group,
+        backup  => $backup,
+        alias   => "concat_fragment_${name}",
+        notify  => Exec["concat_${target}"]
+    }
+
+    if $source {
+        File["${fragdir}/fragments/${order}_${safe_name}"] {
+            source => $source,
+        }
+    }
+    else {
+        File["${fragdir}/fragments/${order}_${safe_name}"] {
+            content => $content,
+        }
+    }
 }
