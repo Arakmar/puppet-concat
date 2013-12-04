@@ -16,29 +16,51 @@
 # [*ensure*]
 #   Present/Absent or destination to a file to include another file
 # [*mode*]
-#   Mode for the file
+#   Deprecated
 # [*owner*]
-#   Owner of the file
+#   Deprecated
 # [*group*]
-#   Owner of the file
+#   Deprecated
 # [*backup*]
-#   Controls the filebucketing behavior of the final file and see File type
-#   reference for its use.  Defaults to 'puppet'
+#   Deprecated
 #
 define concat::fragment(
     $target,
-    $content=undef,
-    $source=undef,
-    $order=10,
-    $ensure = 'present',
-    $mode = '0644',
-    $owner = $::id,
-    $group = $concat::setup::root_group,
-    $backup = 'puppet') {
-  $safe_name = regsubst($name, '[/\n]', '_', 'GM')
-  $safe_target_name = regsubst($target, '[/\n]', '_', 'GM')
-  $concatdir = $concat::setup::concatdir
-  $fragdir = "${concatdir}/${safe_target_name}"
+    $content = undef,
+    $source  = undef,
+    $order   = 10,
+    $ensure  = 'present',
+    $mode    = undef,
+    $owner   = undef,
+    $group   = undef,
+    $backup  = undef
+) {
+  validate_string($target)
+  validate_re($ensure, '^$|^present$|^absent$|^file$|^directory$')
+  validate_string($content)
+  if !(is_string($source) or is_array($source)) {
+    fail('$source is not a string or an Array.')
+  }
+  validate_string($order)
+  if $mode {
+    warning('The $mode parameter to concat::fragment is deprecated and has no effect')
+  }
+  if $owner {
+    warning('The $owner parameter to concat::fragment is deprecated and has no effect')
+  }
+  if $group {
+    warning('The $group parameter to concat::fragment is deprecated and has no effect')
+  }
+  if $backup {
+    warning('The $backup parameter to concat::fragment is deprecated and has no effect')
+  }
+
+  include concat::setup
+
+  $safe_name        = regsubst($name, '[/:\n]', '_', 'GM')
+  $safe_target_name = regsubst($target, '[/:\n]', '_', 'GM')
+  $concatdir        = $concat::setup::concatdir
+  $fragdir          = "${concatdir}/${safe_target_name}"
 
   # if content is passed, use that, else if source is passed use that
   # if neither passed, but $ensure is in symlink form, make a symlink
@@ -53,14 +75,15 @@ define concat::fragment(
     }
   }
 
-  file{"${fragdir}/fragments/${order}_${safe_name}":
+  # punt on group ownership until some point in the distant future when $::gid
+  # can be relied on to be present
+  file { "${fragdir}/fragments/${order}_${safe_name}":
     ensure  => $ensure,
-    mode    => $mode,
-    owner   => $owner,
-    group   => $group,
+    owner   => $::id,
+    mode    => '0640',
     source  => $source,
     content => $content,
-    backup  => $backup,
+    backup  => false,
     alias   => "concat_fragment_${name}",
     notify  => Exec["concat_${target}"]
   }
